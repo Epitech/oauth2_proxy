@@ -128,6 +128,12 @@ type Options struct {
 	signatureData      *SignatureData
 	oidcVerifier       *oidc.IDTokenVerifier
 	jwtBearerVerifiers []*oidc.IDTokenVerifier
+
+	/*
+	 * CUSTOM EPITECH
+	 */
+	EpitechAuthToken string   `flag:"epitech-auth-token" cfg:"epitech_auth_token" env:"OAUTH2_PROXY_EPITECH_AUTH_TOKEN"`
+	EpitechGroups    []string `flag:"epitech-group" cfg:"epitech_group" env:"OAUTH2_PROXY_EPITECH_GROUPS"`
 }
 
 // SignatureData holds hmacauth signature hash and key
@@ -394,6 +400,8 @@ func parseProviderInfo(o *Options, msgs []string) []string {
 
 	o.provider = providers.New(o.Provider, p)
 	switch p := o.provider.(type) {
+	case *providers.EpitechProvider:
+		p.Configure(o.AzureTenant, o.EpitechAuthToken, o.EpitechGroups)
 	case *providers.AzureProvider:
 		p.Configure(o.AzureTenant)
 	case *providers.GitHubProvider:

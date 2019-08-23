@@ -25,6 +25,7 @@ func main() {
 	skipAuthRegex := StringArray{}
 	jwtIssuers := StringArray{}
 	googleGroups := StringArray{}
+	epitechGroups := StringArray{} // CUSTOM EPITECH
 	redisSentinelConnectionURLs := StringArray{}
 
 	config := flagSet.String("config", "", "path to config file")
@@ -128,6 +129,12 @@ func main() {
 	flagSet.String("jwt-key-file", "", "path to the private key file in PEM format used to sign the JWT so that you can say something like -jwt-key-file=/etc/ssl/private/jwt_signing_key.pem: required by login.gov")
 	flagSet.String("pubjwk-url", "", "JWK pubkey access endpoint: required by login.gov")
 	flagSet.Bool("gcp-healthchecks", false, "Enable GCP/GKE healthcheck endpoints")
+
+	/*
+	 * CUSTOM EPITECH
+	 */
+	flagSet.String("epitech-auth-token", "", "Auto-login token (format: auth-*****************).")
+	flagSet.Var(&epitechGroups, "epitech-group", "restrict logins to members of this Epitech Intranet group (may be given multiple times).")
 
 	flagSet.Parse(os.Args[1:])
 

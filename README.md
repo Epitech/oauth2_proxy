@@ -11,6 +11,49 @@ A list of changes can be seen in the [CHANGELOG](CHANGELOG.md).
 
 ![Sign In Page](https://cloud.githubusercontent.com/assets/45028/4970624/7feb7dd8-6886-11e4-93e0-c9904af44ea8.png)
 
+## Epitech Fork
+
+This fork adds support for an Epitech provider, based on AzureAD and Epitech Intranet groups.
+
+Enjoy ;)
+
+### Build
+
+```
+docker build -t samber/epitech-oauth2-proxy:4.0.0 .
+```
+
+### Setup
+
+1- Register a new webapp here => https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app
+
+2- Copy Tenant ID + Client ID
+
+3- Navigate to the "Certificates & secrets" page and create a new "client secret".
+
+4- Navigate to "Authentication" page and set the redirect url to `http://localhost:80/oauth2/callback`
+
+```
+docker run -d -p 80:80 -p 443:443 \
+           samber/epitech-oauth2-proxy \
+                 -upstream=http://very-private-webapp:80 \
+                 -http-address=0.0.0.0:80 \
+                 -redirect-url=http://localhost:80/oauth2/callback \
+                 -scope='profile User.Read' \
+                 -email-domain=* \
+                 -cookie-domain=localhost \
+                 -cookie-secure=false \
+                 -cookie-secret=somerandomstring1234567890 \
+                 -provider=epitech \
+                 -azure-tenant ******************************** \
+                 -client-id ****************************** \
+                 -client-secret '****************************' \
+                 -epitech-group adm -epitech-group dpr -epitech-group dpra -epitech-group ape \
+                 -epitech-auth-token auth-***********************
+```
+
+⚠️  For prod environment, remove the `-cookie-secure=false` argument ;)
+
 ## Installation
 
 1.  Choose how to deploy:
