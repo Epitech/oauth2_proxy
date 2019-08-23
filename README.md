@@ -33,6 +33,8 @@ docker build -t samber/epitech-oauth2-proxy:4.0.0 .
 
 4- Navigate to "Authentication" page and set the redirect url to `http://localhost:80/oauth2/callback`
 
+5- Navigate to "Manifest" page and set `groupMembershipClaims` to `All`.
+
 ```
 docker run -d -p 80:80 -p 443:443 \
            samber/epitech-oauth2-proxy \
