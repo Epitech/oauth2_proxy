@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/pusher/oauth2_proxy/pkg/apis/sessions"
+	"github.com/pusher/oauth2_proxy/pkg/http_cache"
 )
 
 // EpitechProvider represents an Epitech Intranet based Identity Provider
@@ -17,16 +19,17 @@ type EpitechProvider struct {
 	// GroupValidator is a function that determines if the passed email is in
 	// the configured Epitech group.
 	GroupValidator func(string) bool
+
+	client *http.Client
 }
 
-type epitechUserInfoGroup struct {
-	Title string `json:"title"`
-	Name  string `json:"name"`
-	Count int64  `json:"count"`
-}
-
-type epitechUserInfo struct {
-	Groups []epitechUserInfoGroup `json:"groups"`
+type epitechGroupMember struct {
+	Type     string `json:"type"`
+	Login    string `json:"login"`
+	Slug     string `json:"slug"`
+	Location string `json:"location"`
+	Title    string `json:"title"`
+	Close    bool   `json:"close"`
 }
 
 // NewEpitechProvider initiates a new EpitechProvider
@@ -38,6 +41,14 @@ func NewEpitechProvider(p *ProviderData) *EpitechProvider {
 		// be overwritten if we configured a Epitech group restriction.
 		GroupValidator: func(email string) bool {
 			return true
+		},
+
+		//Create a custom client so we can make use of our RoundTripper
+		//If you make use of http.Get(), the default http client located at http.DefaultClient is used instead
+		//Since we have special needs, we have to make use of our own http.RoundTripper implementation
+		client: &http.Client{
+			Transport: http_cache.NewCacheTransport(http.DefaultTransport, 60),
+			Timeout:   time.Second * 5,
 		},
 	}
 
@@ -75,15 +86,15 @@ func (p *EpitechProvider) Redeem(redirectURL, code string) (s *sessions.SessionS
 	}
 
 	// commented for now (probably too much data for X-Forwarded-User header)
-	email, err := p.GetEmailAddress(s)
-	if err != nil {
-		return nil, err
-	}
-	rawUser, err := p.getEpitechUser(email, p.AuthToken)
-	if err != nil {
-		return nil, err
-	}
-	s.User = rawUser
+	// email, err := p.GetEmailAddress(s)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// rawUser, err := p.getEpitechUser(email, p.AuthToken)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// s.User = rawUser
 
 	return
 }
@@ -97,27 +108,52 @@ func (p *EpitechProvider) ValidateGroup(email string) bool {
 func (p *EpitechProvider) verifyGroupMembership(groups []string, authToken string, email string) bool {
 	fmt.Println("Checking Epitech group membership for " + email)
 
-	rawUser, err := p.getEpitechUser(email, authToken)
-	if err != nil {
-		fmt.Println(err.Error())
-		return false
-	}
-
-	user, err := p.unserializeEpitechUser(rawUser)
-	if err != nil {
-		fmt.Println(err.Error())
-		return false
-	}
-
 	for _, group := range groups {
-		for _, userGroup := range user.Groups {
-			if userGroup.Name == group {
+		members, err := p.getEpitechGroupMembers(group, authToken)
+		if err != nil {
+			fmt.Println(err.Error())
+			continue
+		}
+
+		for _, member := range members {
+			if member.Slug == email || member.Login == email {
 				return true
 			}
 		}
 	}
 
 	return false
+}
+
+func (p *EpitechProvider) getEpitechGroupMembers(groupName string, authToken string) ([]epitechGroupMember, error) {
+	path := fmt.Sprintf("https://intra.epitech.eu/%s/group/%s/member?format=json", authToken, groupName)
+
+	var req *http.Request
+	req, err := http.NewRequest("GET", path, nil)
+	if err != nil {
+		return []epitechGroupMember{}, err
+	}
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return []epitechGroupMember{}, err
+	}
+
+	var body []byte
+	body, err = ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return []epitechGroupMember{}, err
+	}
+
+	var members []epitechGroupMember
+	err = json.Unmarshal([]byte(body), &members)
+	if err != nil {
+		return nil, err
+	}
+
+	return members, nil
 }
 
 func (p *EpitechProvider) getEpitechUser(email string, authToken string) (string, error) {
@@ -129,7 +165,7 @@ func (p *EpitechProvider) getEpitechUser(email string, authToken string) (string
 		return "", err
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := p.client.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -142,15 +178,4 @@ func (p *EpitechProvider) getEpitechUser(email string, authToken string) (string
 		return "", err
 	}
 	return string(body), nil
-}
-
-func (p *EpitechProvider) unserializeEpitechUser(body string) (*epitechUserInfo, error) {
-	var user epitechUserInfo
-
-	err := json.Unmarshal([]byte(body), &user)
-	if err != nil {
-		return nil, err
-	}
-
-	return &user, nil
 }
