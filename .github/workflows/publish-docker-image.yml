@@ -1,0 +1,71 @@
+name: Publish Docker image
+
+on:
+  push:
+    branches:
+      - main
+      - release
+      - develop
+    tags:
+      - 'v*'
+
+jobs:
+  get_env:
+    name: Select environment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Select environment based on target branch
+        id: branch_check
+        run: |
+          echo "Running on branch ${{ github.ref }}"
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "::set-output name=env_name::prd"
+          elif [ "${{ github.ref }}" = "refs/heads/release" ]; then
+            echo "::set-output name=env_name::ppd"
+          else
+             echo "::set-output name=env_name::dev"
+          fi
+    outputs:
+      env_name: ${{ steps.branch_check.outputs.env_name }}
+
+  build:
+    needs: [get_env]
+    name: Publish Docker images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        name: [epitech-oauth2-proxy]
+    environment:
+      name: ${{ needs.get_env.outputs.env_name }}-${{ matrix.name }}
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.name }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
