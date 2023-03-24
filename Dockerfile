@@ -1,7 +1,9 @@
 FROM golang:1.12-stretch AS builder
 
+RUN apt update -y && apt-get upgrade -y ca-certificates
+
 # Download tools
-RUN curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.17.1
+RUN curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.17.1
 
 # Copy sources
 WORKDIR $GOPATH/src/github.com/pusher/oauth2_proxy
